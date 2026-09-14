@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_providers.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
+  final confirmCtrl = TextEditingController();
   bool loading = false;
   String? error;
   bool submitted = false;
@@ -21,23 +22,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       error = null;
     });
 
-    if (emailCtrl.text.trim().isEmpty || passCtrl.text.trim().isEmpty) {
+    if (emailCtrl.text.trim().isEmpty ||
+        passCtrl.text.trim().isEmpty ||
+        confirmCtrl.text.trim().isEmpty) {
       setState(() => error = 'Veuillez remplir tous les champs.');
+      return;
+    }
+    if (passCtrl.text != confirmCtrl.text) {
+      setState(() => error = 'Les mots de passe ne correspondent pas.');
+      return;
+    }
+    if (passCtrl.text.length < 6) {
+      setState(() => error = 'Le mot de passe doit contenir au moins 6 caractères.');
       return;
     }
 
     setState(() => loading = true);
     try {
-      await ref.read(authRepositoryProvider).login(emailCtrl.text, passCtrl.text);
-      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      await ref.read(authRepositoryProvider).register(emailCtrl.text, passCtrl.text);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Compte créé avec succès. Connectez-vous.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
     } catch (e) {
-      String message = 'Connexion échouée, vérifie tes identifiants.';
-      if (e.toString().contains('Invalid login credentials')) {
-        message = 'Email ou mot de passe incorrect.';
-      } else if (e.toString().contains('Email not confirmed')) {
-        message = 'Email non confirmé. Vérifiez votre boîte de réception.';
+      String message = 'Inscription échouée.';
+      if (e.toString().contains('already registered')) {
+        message = 'Cet email est déjà utilisé.';
+      } else if (e.toString().contains('Invalid email')) {
+        message = 'Adresse email invalide.';
       } else if (e.toString().contains('network')) {
-        message = 'Erreur réseau. Vérifiez votre connexion Internet.';
+        message = 'Erreur réseau. Vérifiez votre connexion.';
       }
       setState(() => error = message);
     } finally {
@@ -49,21 +68,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     emailCtrl.dispose();
     passCtrl.dispose();
+    confirmCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Connexion')),
+      appBar: AppBar(title: const Text('Inscription')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 48),
+            const SizedBox(height: 32),
             Icon(
-              Icons.login,
+              Icons.person_add,
               size: 64,
               color: Theme.of(context).colorScheme.primary,
             ),
@@ -90,6 +110,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 border: const OutlineInputBorder(),
                 errorText: submitted && passCtrl.text.trim().isEmpty
                     ? 'Le mot de passe est requis'
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: confirmCtrl,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Confirmer le mot de passe',
+                prefixIcon: const Icon(Icons.lock_outline),
+                border: const OutlineInputBorder(),
+                errorText: submitted && confirmCtrl.text.trim().isEmpty
+                    ? 'La confirmation est requise'
                     : null,
               ),
             ),
@@ -126,12 +159,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Se connecter'),
+                  : const Text('S\'inscrire'),
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () => Navigator.pushNamed(context, '/register'),
-              child: const Text('Pas encore de compte ? S\'inscrire'),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Déjà un compte ? Se connecter'),
             ),
           ],
         ),
